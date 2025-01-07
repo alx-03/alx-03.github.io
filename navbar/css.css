@@ -1,0 +1,16 @@
+body .navbar {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    background-color: #303c4c !important;
+    padding: 15px 30px !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+}
+
+body .navbar .navbar-brand {
+    font-family: 'Arial', sans-serif !important;
+    font-size: 1.5rem !important;
+    font-weight: bold !important;
+    color: #4CAF50 !important;
+    text-decoration: none !important;
+}

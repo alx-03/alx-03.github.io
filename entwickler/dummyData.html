@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dummy-Daten Generator</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            margin-top: 20px;
+        }
+
+        label {
+            display: block;
+            margin: 5px 0;
+        }
+
+        input,
+        button {
+            padding: 8px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Dummy-Daten Generator</h1>
+    <div class="container">
+        <label for="numRecords">Anzahl der Datensätze:</label>
+        <input type="number" id="numRecords" value="10" min="1">
+
+        <label for="minCaffeine">Minimale Koffeinmenge (mg):</label>
+        <input type="number" id="minCaffeine" value="50" min="0">
+
+        <label for="maxCaffeine">Maximale Koffeinmenge (mg):</label>
+        <input type="number" id="maxCaffeine" value="200" min="0">
+
+        <label for="startTime">Startzeit (Unix-Timestamp):</label>
+        <input type="number" id="startTime" value="1700000000000">
+
+        <button onclick="generateData()">Daten generieren</button>
+        <button onclick="uploadDataToFirebase()">Daten in Firebase speichern</button>
+    </div>
+
+    <h2>Generierte Daten:</h2>
+    <pre id="generatedData"></pre>
+
+    <script>
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDwL9ZtOy8Si-q5qq3LHcu4Zn3g69dpJ_8",
+            authDomain: "schprojekt-7040d.firebaseapp.com",
+            projectId: "schprojekt-7040d",
+            storageBucket: "schprojekt-7040d.firebasestorage.app",
+            messagingSenderId: "395677865219",
+            appId: "1:395677865219:web:a412480cf931ed39dd8536",
+            measurementId: "G-2MVPVQY46Y"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let generatedData = [];
+
+        function generateData() {
+            const numRecords = document.getElementById('numRecords').value;
+            const minCaffeine = document.getElementById('minCaffeine').value;
+            const maxCaffeine = document.getElementById('maxCaffeine').value;
+            const startTime = document.getElementById('startTime').value;
+
+            generatedData = [];
+
+            for (let i = 0; i < numRecords; i++) {
+                const timestamp = parseInt(startTime) + (i * 3600000);
+                const caffeine = Math.floor(Math.random() * (maxCaffeine - minCaffeine + 1)) + parseInt(minCaffeine);
+
+                generatedData.push({
+                    timecode: timestamp,
+                    caffeine: caffeine,
+                    name: "Kaffee",
+                    guarana: Math.floor(Math.random() * 50),
+                    taurin: Math.floor(Math.random() * 50)
+                });
+            }
+
+            document.getElementById('generatedData').innerText = JSON.stringify(generatedData, null, 2);
+        }
+
+        function uploadDataToFirebase() {
+
+            const userUid = document.cookie.replace(/(?:(?:^|.*;\s*)uid\s*\=\s*([^;]*).*$)|^.*$/, "$1");
+
+            generatedData.forEach(entry => {
+                const timecode = entry.timecode;
+                database.ref(`users/${userUid}/drinks/${timecode}`).set(entry)
+                    .then(() => {
+                        console.log(`Daten für Zeitcode ${timecode} erfolgreich in Firebase gespeichert.`);
+                    })
+                    .catch((error) => {
+                        console.error(`Fehler beim Speichern der Daten für Zeitcode ${timecode}:`, error);
+                    });
+            });
+        }
+    </script>
+</body>
+
+</html>

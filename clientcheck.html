@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting...</title>
+    <script>
+        // Anpassung für ios
+        window.onload = function () {
+            if (window.innerWidth <= 800) {
+                setTimeout(function () { document.location.href = "tracker/index.html"; }, 250);
+                document.cookie = "layout=mobile; path=/";
+            } else {
+                setTimeout(function () { document.location.href = "Desktop/index.html"; }, 250);
+                document.cookie = "layout=desktop; path=/";
+            }
+        };
+    </script>
+    <a href="tracker/index.html">Hier Klicken für eine manuelle Weiterleitung</a>
+</head>
+
+<body>
+</body>
+
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toleranzberechnung</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            background-color: #202c3c;
+            color: #ffffff;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        #tolerance-value {
+            font-size: 16px;
+            border: 2px solid orange;
+            border-radius: 10px;
+            padding: 10px;
+            background-color: rgba(255, 165, 0, 0.2);
+        }
+    </style>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDwL9ZtOy8Si-q5qq3LHcu4Zn3g69dpJ_8",
+            authDomain: "schprojekt-7040d.firebaseapp.com",
+            projectId: "schprojekt-7040d",
+            storageBucket: "schprojekt-7040d.firebasestorage.app",
+            messagingSenderId: "395677865219",
+            appId: "1:395677865219:web:a412480cf931ed39dd8536",
+            measurementId: "G-2MVPVQY46Y"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const userEmail = localStorage.getItem('userEmail');
+            const userUid = localStorage.getItem('userUid');
+
+            if (!userEmail || !userUid) {
+                document.getElementById('welcome-message').innerText = 'Bitte melden Sie sich an.';
+                window.location.href = "login.html";
+                return;
+            }
+
+            const drinksRef = database.ref(`users/${userUid}/drinks`);
+            const statsRef = database.ref(`users/${userUid}/stats`);
+
+            statsRef.once('value', (snapshot) => {
+                const maxKoffein = snapshot.val().koffein || 100;
+
+                drinksRef.once('value', (snapshot) => {
+                    let totalKoffein = 0;
+                    const oneMonthAgo = new Date();
+                    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+                    snapshot.forEach((childSnapshot) => {
+                        const data = childSnapshot.val();
+                        const drinkDate = new Date(data.date);
+
+                        if (drinkDate >= oneMonthAgo) {
+                            totalKoffein += data.koffein ? parseInt(data.koffein) : 0;
+                        }
+                    });
+
+                    const tolerance = maxKoffein + totalKoffein;
+                    document.getElementById('tolerance-value').innerText = `Tolleranz: ${tolerance}mg`;
+                });
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <div id="welcome-message" style="margin-bottom: 20px;"></div>
+        <div id="tolerance-value" style="font-size: 16px;">-</div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ping Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #121212;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      margin: 0;
+    }
+
+    .card {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 20px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      position: relative;
+    }
+
+    .avg-ping {
+      text-align: center;
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #ffcc00;
+    }
+
+    .avg-ping.red {
+      color: red;
+    }
+
+    .avg-ping-label {
+      text-align: center;
+      font-size: 1em;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+
+    .metrics-row {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .metric {
+      flex: 1;
+      text-align: center;
+    }
+
+    .metric span {
+      display: block;
+      font-size: 1.2em;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+
+    .chart-container {
+      margin-top: 20px;
+      position: relative;
+      height: 300px;
+      width: 100%;
+    }
+
+    canvas {
+      animation: fadeIn 1.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .settings {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 20px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+      margin-top: 20px;
+    }
+
+    .settings label {
+      display: block;
+      margin-bottom: 10px;
+      color: #aaa;
+    }
+
+    .settings input {
+      width: calc(33% - 10px);
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      margin-bottom: 20px;
+      background-color: #7a7a7a;
+      box-sizing: border-box;
+    }
+
+    .settings input[type="color"] {
+      padding: 0;
+      height: 40px;
+      width: 50px;
+    }
+
+    .settings-container {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .ping-red {
+      color: red;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <div class="avg-ping-label">AVERAGE PING</div>
+    <div class="avg-ping" id="avgPingDisplay">0 ms</div>
+    <div class="metrics-row">
+      <div class="metric">
+        <label>LATEST PING</label>
+        <span id="latestPing">0 ms</span>
+      </div>
+      <div class="metric">
+        <label>MIN PING</label>
+        <span id="minPing">0 ms</span>
+      </div>
+      <div class="metric">
+        <label>MAX PING</label>
+        <span id="maxPing">0 ms</span>
+      </div>
+      <div class="metric">
+        <label>SENT PACKETS</label>
+        <span id="sentPackets">0</span>
+      </div>
+      <div class="metric">
+        <label>PACKET LOSS</label>
+        <span id="packetLoss">0%</span>
+      </div>
+      <div class="metric">
+        <label>AVERAGE JITTER</label>
+        <span id="jitter">0 ms</span>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="pingChart"></canvas>
+    </div>
+  </div>
+
+  <div class="settings">
+    <ul class="settings-list">
+      <li>
+        <label for="accentColor">Accent Color:</label>
+        <input type="color" id="accentColor" value="#ffcc00">
+      </li>
+      <li>
+        <label for="timeoutColor">Timeout Color:</label>
+        <input type="color" id="timeoutColor" value="#ff0000">
+      </li>
+      <li>
+        <label for="maxGraphSize">Max Graph Size (Seconds):</label>
+        <input type="number" id="maxGraphSize" value="60">
+      </li>
+      <li>
+        <label for="updateRate">Update Rate (Seconds):</label>
+        <input type="number" id="updateRate" value="1" step="0.1" min="0.1">
+      </li>
+      <li>
+        <label for="showTime">Show Time on Graph:</label>
+        <input type="checkbox" id="showTime">
+      </li>
+    </ul>
+  </div>
+
+  <style>
+    .settings-list {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .settings-list li {
+      margin-bottom: 10px;
+    }
+
+    .settings-list label {
+      display: block;
+      margin-bottom: 5px;
+      color: #aaa;
+    }
+
+    .settings-list input[type="color"],
+    .settings-list input[type="number"],
+    .settings-list input[type="checkbox"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      background-color: #7a7a7a;
+      box-sizing: border-box;
+    }
+
+    .settings-list input[type="color"] {
+      padding: 0;
+      height: 40px;
+      width: 50px;
+    }
+  </style>
+
+  <script>
+    const pings = [];
+    const jitters = [];
+    const sentPacketsLast30Sec = [];
+    const recvPacketsLast30Sec = [];
+    let minPing = Infinity, maxPing = 0, totalPing = 0, totalJitter = 0, sentPackets = 0, recvPackets = 0;
+    let pingInterval;
+
+    const ctx = document.getElementById('pingChart').getContext('2d');
+    const pingChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Ping (ms)',
+          data: [],
+          borderColor: '#ffcc00',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: false,
+        }],
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+        },
+        responsive: true,
+        scales: {
+          x: { display: false },
+          y: { ticks: { color: '#fff' }, grid: { color: '#2a2a2a' } },
+        },
+      },
+    });
+
+    document.getElementById('accentColor').addEventListener('input', function () {
+      const newColor = this.value;
+      pingChart.data.datasets[0].borderColor = newColor;
+      document.getElementById('avgPingDisplay').style.color = newColor;
+      pingChart.update();
+    });
+
+    document.getElementById('timeoutColor').addEventListener('input', function () {
+      const newColor = this.value;
+      document.documentElement.style.setProperty('--timeout-color', newColor);
+    });
+
+    document.getElementById('maxGraphSize').addEventListener('input', function () {
+      const maxSize = parseInt(this.value, 10);
+      while (pings.length > maxSize) {
+        const removedPing = pings.shift();
+        totalPing -= removedPing;
+        pingChart.data.labels.shift();
+        pingChart.data.datasets[0].data.shift();
+      }
+      while (jitters.length > maxSize - 1) {
+        const removedJitter = jitters.shift();
+        totalJitter -= removedJitter;
+      }
+      pingChart.update();
+    });
+
+    document.getElementById('showTime').addEventListener('change', function () {
+      pingChart.options.scales.x.display = this.checked;
+      pingChart.update();
+    });
+
+    document.getElementById('updateRate').addEventListener('input', function () {
+      const newRate = parseFloat(this.value) * 1000;
+      if (newRate > 0) {
+        clearInterval(pingInterval);
+        pingInterval = setInterval(runPing, newRate);
+      }
+    });
+
+    function updateMetrics(ping, isTimeout = false) {
+      const maxSize = parseInt(document.getElementById('maxGraphSize').value, 10);
+      pings.push(ping);
+      if (!isTimeout) {
+        totalPing += ping;
+      }
+      if (pings.length > maxSize) {
+        const removedPing = pings.shift();
+        if (removedPing !== 0) {
+          totalPing -= removedPing;
+        }
+        pingChart.data.labels.shift();
+        pingChart.data.datasets[0].data.shift();
+      }
+      const len = pings.length;
+
+      minPing = Math.min(minPing, ping);
+      maxPing = Math.max(maxPing, ping);
+      if (!isTimeout) {
+        recvPackets++;
+      }
+
+      if (len > 1) {
+        const jitter = Math.abs(ping - pings[len - 2]);
+        jitters.push(jitter);
+        totalJitter += jitter;
+        if (jitters.length > maxSize - 1) {
+          const removedJitter = jitters.shift();
+          totalJitter -= removedJitter;
+        }
+      }
+
+      pingChart.data.labels.push(len);
+      pingChart.data.datasets[0].data.push({
+        x: len,
+        y: ping,
+        borderColor: isTimeout ? getComputedStyle(document.documentElement).getPropertyValue('--timeout-color') : pingChart.data.datasets[0].borderColor
+      });
+      pingChart.update();
+
+      sentPacketsLast30Sec.push(sentPackets);
+      recvPacketsLast30Sec.push(recvPackets);
+      if (sentPacketsLast30Sec.length > 30) {
+        sentPacketsLast30Sec.shift();
+        recvPacketsLast30Sec.shift();
+      }
+
+      const recentPings = pings.slice(-10);
+      const avgPing = (recentPings.reduce((sum, p) => sum + p, 0) / recentPings.length).toFixed(2);
+      const avgJitter = (totalJitter / jitters.length).toFixed(2);
+      const loss = (((sentPacketsLast30Sec[sentPacketsLast30Sec.length - 1] - recvPacketsLast30Sec[recvPacketsLast30Sec.length - 1]) / sentPacketsLast30Sec[sentPacketsLast30Sec.length - 1]) * 100).toFixed(2);
+
+      const avgPingDisplay = document.getElementById('avgPingDisplay');
+      avgPingDisplay.textContent = `${avgPing} ms`;
+      avgPingDisplay.className = 'avg-ping';
+
+      document.getElementById('latestPing').textContent = ping + ' ms';
+      document.getElementById('minPing').textContent = minPing + ' ms';
+      document.getElementById('maxPing').textContent = maxPing + ' ms';
+      document.getElementById('sentPackets').textContent = sentPackets;
+      document.getElementById('packetLoss').textContent = loss + '%';
+      document.getElementById('jitter').textContent = avgJitter + ' ms';
+
+      if (isTimeout) {
+        avgPingDisplay.classList.add('ping-red');
+      } else {
+        avgPingDisplay.classList.remove('ping-red');
+      }
+    }
+
+    async function runPing() {
+      sentPackets++;
+      const startTime = performance.now();
+      try {
+        await fetch('https://dns.google/resolve?name=example.com', { method: 'GET', cache: 'no-store' });
+        const ping = Math.round(performance.now() - startTime);
+        updateMetrics(ping);
+      } catch {
+        console.log('Packet lost');
+        updateMetrics(0, true);
+      }
+    }
+
+    pingInterval = setInterval(runPing, parseFloat(document.getElementById('updateRate').value) * 1000);
+  </script>

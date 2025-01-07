@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koffeintracker</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
+    <style>
+        :root {
+            --primary: #4caf50;
+            --secondary: #368839;
+            --background: #202c3c;
+            --surface: #202c3c;
+            --text: #ffffff;
+            --text-hover: #ffffff;
+            --navbar-active: #4caf50;
+            --navbar-inactive: #999999;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background);
+            color: #ffffff;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            margin: 20px 0;
+        }
+
+        #debugOutput {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            background: var(--surface);
+            color: var(--text);
+            position: relative;
+            display: none;
+            box-sizing: border-box;
+            width: 90%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #copyButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background-color: var(--primary);
+            color: var(--text);
+            border: none;
+            cursor: pointer;
+        }
+
+        #copyButton:hover {
+            background-color: #45a049;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 24px;
+            }
+
+            #debugOutput {
+                padding: 10px;
+                font-size: 14px;
+            }
+
+            #copyButton {
+                padding: 4px 8px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #debugOutput {
+                width: 95%;
+                padding: 8px;
+                font-size: 12px;
+            }
+
+            #copyButton {
+                padding: 3px 7px;
+                font-size: 10px;
+            }
+        }
+
+        .settings-icon {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+
+            text-decoration: none;
+            color: #fff;
+
+            z-index: 1000;
+
+        }
+
+        .settings-icon:hover {
+            color: #ccc;
+
+        }
+
+        .navbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--surface);
+            box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 60px;
+        }
+
+        .navbar a {
+            text-decoration: none;
+            color: var(--navbar-inactive);
+            text-align: center;
+            font-size: 0.9rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100px;
+        }
+
+        .navbar a.active {
+            color: var(--navbar-active);
+        }
+
+        .navbar a i {
+            font-size: 1.8rem;
+            margin-bottom: 2px;
+        }
+
+        @media (min-width: 1024px) {
+            .caffeineChart {
+                width: 30%;
+                max-height: 31%;
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Statistik</h1>
+    <canvas id="caffeineChart" class="caffeineChart" width="400" height="200"></canvas>
+    <div id="debugOutput">
+        <button id="copyButton">Kopieren</button>
+        <strong>Debugging Informationen:</strong>
+        <pre id="debugInfo"></pre>
+    </div>
+    <iframe src="history.html" style="width: 100%; height: 500px; border: none;"></iframe>
+
+    <nav class="navbar">
+        <a href="index.html">
+            <i class="material-icons">home</i>
+            Home
+        </a>
+        <a href="#" class="active">
+            <i class="material-icons">bar_chart</i>
+            Statistik
+        </a>
+        <a href="settings.html">
+            <i class="material-icons">settings</i>
+            Einstellungen
+        </a>
+    </nav>
+
+    <script>
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDwL9ZtOy8Si-q5qq3LHcu4Zn3g69dpJ_8",
+            authDomain: "schprojekt-7040d.firebaseapp.com",
+            projectId: "schprojekt-7040d",
+            storageBucket: "schprojekt-7040d.firebasestorage.app",
+            messagingSenderId: "395677865219",
+            appId: "1:395677865219:web:a412480cf931ed39dd8536",
+            measurementId: "G-2MVPVQY46Y"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        function getCookie(name) {
+            const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            return match ? match[2] : null;
+        }
+
+        const devMode = getCookie('devmode') === 'true';
+
+        if (devMode) {
+            document.getElementById('debugOutput').style.display = 'block';
+        }
+
+        function logDebug(message, data) {
+            console.log(message, data || '');
+            if (devMode) {
+                const debugElement = document.getElementById('debugInfo');
+                debugElement.innerText += `${message}\n${JSON.stringify(data, null, 2)}\n\n`;
+            }
+        }
+
+        const userUid = localStorage.getItem('userUid');
+        logDebug('Benutzer-UID abgerufen:', userUid);
+
+        if (!userUid) {
+            logDebug('Fehler: Benutzer-UID ist nicht im localStorage gespeichert!');
+        } else {
+
+            database.ref(`users/${userUid}/drinks`).once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    logDebug('Daten erfolgreich aus Firebase abgerufen:', data);
+
+                    if (!data) {
+                        logDebug('Keine Daten gefunden. Überprüfe die Datenstruktur in Firebase.');
+                        return;
+                    }
+
+                    const labels = [];
+                    const caffeineValues = [];
+                    const guaranaValues = [];
+                    const taurineValues = [];
+
+                    for (const timecode in data) {
+                        const entry = data[timecode];
+                        logDebug(`Eintrag für timecode ${timecode}:`, entry);
+
+                        labels.push(new Date(parseInt(timecode)).toLocaleString());
+
+                        const caffeineValue = entry.koffein ? parseFloat(entry.koffein) : 0; 0;
+                        caffeineValues.push(caffeineValue);
+
+                        const guaranaValue = entry.guarana ? parseFloat(entry.guarana) : 0;
+                        guaranaValues.push(guaranaValue);
+
+                        const taurineValue = entry.taurin !== undefined ? parseFloat(entry.taurin) : 0;
+                        taurineValues.push(taurineValue);
+                    }
+
+                    logDebug('Extrahierte Labels:', labels);
+                    logDebug('Extrahierte Koffeinwerte:', caffeineValues);
+
+                    const ctx = document.getElementById('caffeineChart').getContext('2d');
+                    new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [
+                                {
+                                    label: 'Koffeinlevel (mg)',
+                                    data: caffeineValues,
+                                    borderColor: 'rgba(54, 162, 235, 1)',
+                                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'Guaranalevel (mg)',
+                                    data: guaranaValues,
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'Taurinlevel (mg)',
+                                    data: taurineValues,
+                                    borderColor: 'rgba(255, 159, 64, 1)',
+                                    backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Zeit',
+                                        color: 'white'
+                                    },
+                                    ticks: {
+                                        color: 'white'
+                                    }
+                                },
+                                y: {
+                                    title: {
+                                        display: true,
+                                        text: 'Wert (mg)',
+                                        color: 'white'
+                                    },
+                                    ticks: {
+                                        color: 'white'
+                                    },
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                zoom: {
+                                    pan: {
+                                        enabled: true,
+                                        mode: 'x'
+                                    },
+                                    zoom: {
+                                        wheel: {
+                                            enabled: true
+                                        },
+                                        pinch: {
+                                            enabled: true
+                                        },
+                                        mode: 'x'
+                                    }
+                                },
+                                legend: {
+                                    labels: {
+                                        color: 'white'
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    logDebug('Diagramm mit Zoom- und Pan-Funktion erstellt.');
+                })
+                .catch((error) => {
+                    logDebug('Fehler beim Abrufen der Daten:', error);
+                });
+        }
+
+        document.getElementById('copyButton').addEventListener('click', () => {
+            const debugText = document.getElementById('debugInfo').innerText;
+            navigator.clipboard.writeText(debugText).then(() => {
+                alert('Debugging-Informationen kopiert!');
+            }).catch(err => {
+                alert('Fehler beim Kopieren: ' + err);
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UID Login</title>
+</head>
+
+<body>
+    <h1>UID Login</h1>
+    <p>UID:</p>
+    <input type="text" id="uidInput" placeholder="UID eingeben">
+    <button onclick="saveUID()">Speichern</button>
+
+    <script>
+        function saveUID() {
+            const uid = document.getElementById('uidInput').value;
+            localStorage.setItem('userUid', uid);
+            const userUid = localStorage.getItem('userUid');
+            console.log('Gespeicherte UID:', userUid);
+            alert('UID erfolgreich gespeichert: ' + userUid);
+        }
+    </script>
+</body>
+
+</html>
