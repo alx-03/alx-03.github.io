@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Letzte Getränke</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
@@ -88,27 +87,32 @@
         const database = firebase.database();
 
         document.addEventListener('DOMContentLoaded', () => {
-            const userUid = localStorage.getItem('userUid');
-            if (!userUid) {
-                alert('Bitte anmelden.');
-                return;
+    const userUid = localStorage.getItem('userUid');
+    if (!userUid) {
+        alert('Bitte anmelden.');
+        return;
+    }
+
+    const drinksRef = database.ref(`users/${userUid}/drinks`).orderByKey();
+    const eightHoursAgo = Date.now() - 8 * 60 * 60 * 1000;
+
+    drinksRef.once('value', (snapshot) => {
+        let historyHtml = '';
+        const drinksArray = [];
+
+        snapshot.forEach((childSnapshot) => {
+            const timeStamp = parseInt(childSnapshot.key);
+            const data = childSnapshot.val();
+            if (timeStamp >= eightHoursAgo) {
+                drinksArray.push({ timeStamp, data, key: childSnapshot.key });
             }
+        });
 
-            const drinksRef = database.ref(`users/${userUid}/drinks`).orderByKey();
-            drinksRef.once('value', (snapshot) => {
-                let historyHtml = '';
-                const drinksArray = [];
+        drinksArray.sort((a, b) => b.timeStamp - a.timeStamp);
+        drinksArray.forEach((drink) => {
+            const date = new Date(drink.timeStamp);
 
-                snapshot.forEach((childSnapshot) => {
-                    const timeStamp = childSnapshot.key;
-                    const data = childSnapshot.val();
-                    drinksArray.push({ timeStamp, data, key: childSnapshot.key });
-                });
-                drinksArray.sort((a, b) => b.timeStamp - a.timeStamp);
-                drinksArray.forEach((drink) => {
-                    const date = new Date(parseInt(drink.timeStamp));
-
-                    historyHtml += `
+            historyHtml += `
             <div class="card">
                 <div style="font-size:20px"><span></span> ${drink.data.name}</div>
                 <div><span>Koffein:</span> ${drink.data.koffein || 0} mg</div>
@@ -118,11 +122,12 @@
                 <button class="delete-button" onclick="deleteDrink('${drink.key}')">Löschen</button>
             </div>
         `;
-                });
-
-                document.getElementById('history').innerHTML = historyHtml;
-            });
         });
+
+        document.getElementById('history').innerHTML = historyHtml;
+    });
+});
+
 
         function deleteDrink(key) {
             const userUid = localStorage.getItem('userUid');
